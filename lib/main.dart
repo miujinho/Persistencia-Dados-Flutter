@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -54,17 +55,30 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  late SharedPreferences prefs; // Declaração sem inicialização
+  int _counter = 0; // Inicializa como 0, será atualizado depois
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _loadCounter(); // Carrega o valor salvo assim que a tela é criada
+  }
+
+  Future<void> _loadCounter() async {
+    prefs = await SharedPreferences.getInstance();
+    final counter = prefs.getInt('counter') ?? 0; // Use getInt, não getBool!
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _counter = counter;
     });
+  }
+
+  void _incrementCounter() async { // ← Importante: tornar a função async!
+    setState(() {
+      _counter++; // Atualiza a UI imediatamente
+    });
+
+    // Salva no SharedPreferences DEPOIS de atualizar o estado
+    await prefs.setInt('counter', _counter);
   }
 
   @override
