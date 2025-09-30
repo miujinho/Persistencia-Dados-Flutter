@@ -1,10 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  if (kIsWeb) {
+    try {
+      databaseFactory = databaseFactoryFfiWeb;
+    } catch (e) {
+      print('Erro ao configurar databaseFactoryFfiWeb: $e');
+    }
+  }
+
   runApp(const MyApp());
 }
 
@@ -43,7 +59,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Sistema de Armazenamento',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -75,51 +91,109 @@ class HomeScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ThemeToggleScreen(onToggleTheme: onToggleTheme)),
-                );
-              },
-              child: const Text('Alternar Tema (SharedPreferences)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ThemeToggleScreen(onToggleTheme: onToggleTheme)),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Alternar Tema (SharedPreferences)'),
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => TokenStorageScreen()),
-                );
-              },
-              child: const Text('Armazenar Token (Secure Storage)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => TokenStorageScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Armazenar Token (Secure Storage)'),
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => TaskListScreen()),
-                );
-              },
-              child: const Text('Gerenciar Tarefas (SQLite CRUD)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => TaskListScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Gerenciar Tarefas (SQLite CRUD)'),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => UserRegistrationScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Cadastrar Usuários (Firebase Firestore)'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ProductListScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Listar Produtos (Supabase)'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ComparisonScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Comparação Local vs Nuvem'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => DataFlowDiagramScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Diagrama de Fluxo de Dados'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -242,20 +316,20 @@ class _TokenStorageScreenState extends State<TokenStorageScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _saveToken,
-              child: const Text('Salvar Token'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),
+              child: const Text('Salvar Token'),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _deleteToken,
-              child: const Text('Remover Token'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
+              child: const Text('Remover Token'),
             ),
             const SizedBox(height: 20),
             Text(
@@ -335,12 +409,14 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
+    // Use getDatabasesPath() da instância do databaseFactory configurado
     final path = join(await getDatabasesPath(), 'tasks.db');
-    return await openDatabase(
+    return await databaseFactory.openDatabase(
       path,
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (db, version) async {
+          await db.execute('''
           CREATE TABLE tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -348,7 +424,8 @@ class DatabaseHelper {
             due_date TEXT
           )
         ''');
-      },
+        },
+      ),
     );
   }
 
@@ -611,6 +688,440 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// MODELO DE USUÁRIO PARA FIREBASE
+class User {
+  String? id;
+  String name;
+  String email;
+  DateTime createdAt;
+
+  User({
+    this.id,
+    required this.name,
+    required this.email,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  static User fromMap(Map<String, dynamic> map) {
+    return User(
+      id: map['id'],
+      name: map['name'],
+      email: map['email'],
+      createdAt: DateTime.parse(map['created_at']),
+    );
+  }
+}
+
+// TELA DE CADASTRO DE USUÁRIOS COM FIREBASE
+class UserRegistrationScreen extends StatefulWidget {
+  const UserRegistrationScreen({super.key});
+
+  @override
+  State<UserRegistrationScreen> createState() => _UserRegistrationScreenState();
+}
+
+class _UserRegistrationScreenState extends State<UserRegistrationScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  String _message = '';
+
+  // Simulação de Firestore - na prática, você precisaria configurar Firebase
+  CollectionReference usersCollection = FirebaseFirestore.instance.collection('users');
+
+  Future<void> _registerUser() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        await usersCollection.add({
+          'name': _nameController.text,
+          'email': _emailController.text,
+          'created_at': DateTime.now(),
+        });
+        
+        setState(() {
+          _message = 'Usuário cadastrado com sucesso!';
+          _nameController.clear();
+          _emailController.clear();
+        });
+      } catch (e) {
+        setState(() {
+          _message = 'Erro ao cadastrar usuário: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Cadastrar Usuário (Firebase)'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Nome'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Por favor, insira o nome';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Por favor, insira o email';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Email inválido';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _registerUser,
+                child: const Text('Cadastrar Usuário'),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _message,
+                style: TextStyle(
+                  color: _message.contains('sucesso') ? Colors.green : Colors.red,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Observação: Esta funcionalidade requer configuração do Firebase Firestore.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// MODELO DE PRODUTO PARA SUPABASE
+class Product {
+  int? id;
+  String name;
+  double price;
+  String description;
+
+  Product({
+    this.id,
+    required this.name,
+    required this.price,
+    required this.description,
+  });
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id'],
+      name: json['name'],
+      price: (json['price'] as num).toDouble(),
+      description: json['description'],
+    );
+  }
+}
+
+// TELA DE LISTAGEM DE PRODUTOS COM SUPABASE
+class ProductListScreen extends StatefulWidget {
+  const ProductListScreen({super.key});
+
+  @override
+  State<ProductListScreen> createState() => _ProductListScreenState();
+}
+
+class _ProductListScreenState extends State<ProductListScreen> {
+  List<Product> _products = [];
+  bool _isLoading = false;
+
+  // Simulação de chamada à API do Supabase
+  Future<List<Product>> _fetchProducts() async {
+    // Substitua pela sua URL do Supabase
+    final url = 'https://SEU_PROJETO.supabase.co/rest/v1/products?select=*';
+    final headers = {
+      'apikey': 'SEU_API_KEY',
+      'Authorization': 'Bearer SEU_API_KEY',
+    };
+
+    try {
+      final response = await http.get(Uri.parse(url), headers: headers);
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => Product.fromJson(json)).toList();
+      } else {
+        throw Exception('Falha ao carregar produtos');
+      }
+    } catch (e) {
+      // Simulação de dados para demonstração
+      return [
+        Product(id: 1, name: 'Produto 1', price: 10.99, description: 'Descrição do produto 1'),
+        Product(id: 2, name: 'Produto 2', price: 20.50, description: 'Descrição do produto 2'),
+        Product(id: 3, name: 'Produto 3', price: 15.75, description: 'Descrição do produto 3'),
+      ];
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final products = await _fetchProducts();
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // Agendamos o SnackBar para o próximo frame para garantir que o context esteja disponível
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(content: Text('Erro ao carregar produtos: $e')),
+            );
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Produtos (Supabase)'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _products.isEmpty
+              ? const Center(child: Text('Nenhum produto encontrado'))
+              : ListView.builder(
+                  itemCount: _products.length,
+                  itemBuilder: (context, index) {
+                    final product = _products[index];
+                    return Card(
+                      margin: const EdgeInsets.all(8.0),
+                      child: ListTile(
+                        title: Text(product.name),
+                        subtitle: Text(product.description),
+                        trailing: Text(
+                          'R\$ ${product.price.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _loadProducts,
+        child: const Icon(Icons.refresh),
+      ),
+    );
+  }
+}
+
+// TELA DE COMPARAÇÃO LOCAL VS NUVEM
+class ComparisonScreen extends StatelessWidget {
+  const ComparisonScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Comparação Local vs Nuvem'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Armazenamento Local (SQLite)',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _buildComparisonItem(
+              'Prós:',
+              [
+                'Dados disponíveis offline',
+                'Maior privacidade',
+                'Desempenho rápido',
+                'Sem custos de hospedagem',
+                'Controle total dos dados'
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildComparisonItem(
+              'Contras:',
+              [
+                'Dados não sincronizados entre dispositivos',
+                'Limitado ao dispositivo',
+                'Backup manual necessário',
+                'Difícil de compartilhar dados',
+                'Escalabilidade limitada'
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Armazenamento em Nuvem (Firebase/Supabase)',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _buildComparisonItem(
+              'Prós:',
+              [
+                'Sincronização entre dispositivos',
+                'Acesso remoto',
+                'Backup automático',
+                'Escalabilidade',
+                'Compartilhamento de dados fácil',
+                'Autenticação integrada'
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildComparisonItem(
+              'Contras:',
+              [
+                'Requer conexão com internet',
+                'Custos de hospedagem',
+                'Menor privacidade',
+                'Dependência de provedor',
+                'Latência de rede',
+                'Limitações de uso'
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComparisonItem(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
+          child: Text('• $item'),
+        )),
+      ],
+    );
+  }
+}
+
+// TELA DO DIAGRAMA DE FLUXO DE DADOS
+class DataFlowDiagramScreen extends StatelessWidget {
+  const DataFlowDiagramScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Diagrama de Fluxo de Dados'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Fluxo de Dados do Aplicativo',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              _buildFlowStep('1. Tela Principal', 'Tela inicial com opções de funcionalidades'),
+              const SizedBox(height: 10),
+              _buildFlowStep('2. SharedPreferences', 'Armazenamento de preferências locais (tema)'),
+              const SizedBox(height: 10),
+              _buildFlowStep('3. Secure Storage', 'Armazenamento seguro de tokens e senhas'),
+              const SizedBox(height: 10),
+              _buildFlowStep('4. SQLite (Local)', 'CRUD de tarefas armazenadas localmente'),
+              const SizedBox(height: 10),
+              _buildFlowStep('5. Firebase Firestore', 'Cadastro e gerenciamento de usuários na nuvem'),
+              const SizedBox(height: 10),
+              _buildFlowStep('6. Supabase', 'Listagem de produtos da base de dados na nuvem'),
+              const SizedBox(height: 20),
+              const Text(
+                'Resumo:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'O aplicativo demonstra diferentes formas de armazenamento de dados, '
+                'desde armazenamento local simples (SharedPreferences, SQLite) até '
+                'soluções em nuvem (Firebase, Supabase), cada uma com seus casos '
+                'de uso específicos e vantagens/desvantagens.',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlowStep(String title, String description) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(description, style: const TextStyle(color: Colors.grey)),
+        ],
       ),
     );
   }
